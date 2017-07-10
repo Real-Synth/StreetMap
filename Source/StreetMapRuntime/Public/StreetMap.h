@@ -2,7 +2,26 @@
 
 #pragma once
 
+#include "LandscapeProxy.h"
 #include "StreetMap.generated.h"
+
+
+/** Types of miscellaneous ways */
+UENUM(BlueprintType)
+enum EStreetMapMiscWayType
+{
+	/** unknown type */
+	Unknown,
+
+	/** The leisure tag is for places people go in their spare time (e.g. parks, pitches). */
+	Leisure,
+
+	/** Used to describe natural and physical land features (e.g. wood, beach, water). */
+	Natural,
+
+	/** Used to describe the primary use of land by humans (e.g. grass, meadow, forest). */
+	LandUse,
+};
 
 
 USTRUCT(BlueprintType)
@@ -118,6 +137,121 @@ public:
 };
 
 
+/** Identifies a specific type of way */
+USTRUCT(BlueprintType)
+struct STREETMAPRUNTIME_API FWayMatch
+{
+	GENERATED_USTRUCT_BODY()
+
+public:
+
+	/** The OSM type this way is marked as */
+	UPROPERTY(Category = StreetMap, EditAnywhere)
+		TEnumAsByte<EStreetMapMiscWayType> Type;
+
+	// Minimal size of the Landscape in each direction around the center of the OpenStreetMap in meters.
+	UPROPERTY(Category = "Landscape", EditAnywhere)
+		FString Category;
+
+	FWayMatch()
+		: Type(EStreetMapMiscWayType::Unknown)
+		, Category(TEXT(""))
+	{
+	}
+
+	FWayMatch(EStreetMapMiscWayType Type, const FString& Category)
+		: Type(Type)
+		, Category(Category)
+	{
+	}
+};
+
+
+/** Maps multiple types of ways to a specific Landscae layer */
+USTRUCT(BlueprintType)
+struct STREETMAPRUNTIME_API FLayerWayMapping
+{
+	GENERATED_USTRUCT_BODY()
+
+public:
+
+	// The Layer's name this mapping is used for
+	UPROPERTY(Category = "Landscape", VisibleAnywhere)
+		FName LayerName;
+
+	// Types of ways that make this layer up
+	UPROPERTY(Category = "Landscape", EditAnywhere)
+		TArray<FWayMatch> Matches;
+
+	FLayerWayMapping()
+	{
+	}
+};
+
+
+/** Landscape generation settings */
+USTRUCT(BlueprintType)
+struct STREETMAPRUNTIME_API FStreetMapLandscapeBuildSettings
+{
+	GENERATED_USTRUCT_BODY()
+
+public:
+	// Horizontal distance between elevation data points in meters. Keep in mind that elevation data is usually available in 10-30 meter resolution. Anything in between will be interpolated.
+	UPROPERTY(Category = "Landscape", EditAnywhere, meta = (UIMin = 1, ClampMin = 0.25f, ClampMax = 100.0f))
+		float QuadSize;
+
+	// Minimal size of the Landscape in each direction around the center of the OpenStreetMap in meters.
+	UPROPERTY(Category = "Landscape", EditAnywhere, meta = (UIMin = 1, ClampMin = 256, ClampMax = 16384))
+		int32 Radius;
+
+	// Width of the blend area between layers in meters.
+	UPROPERTY(Category = "Landscape", EditAnywhere, meta = (UIMin = 1, ClampMin = 0.0f, ClampMax = 200.0f))
+		float BlendGauge;
+
+	// Material initially applied to the landscape. Setting a material here exposes properties for setting up layer info based on the landscape blend nodes in the material.
+	UPROPERTY(Category = "Landscape", EditAnywhere, meta = (DisplayName = "Material", ShowForTools = "Landscape"))
+		UMaterialInterface* Material;
+
+	// The landscape layers that will be created. Only layer names referenced in the material assigned above are shown here. Modify the material to add more layers.
+	UPROPERTY(Category = "Landscape", EditAnywhere, NonTransactional, EditFixedSize, meta = (DisplayName = "Layers", ShowForTools = "Landscape"))
+		TArray<FLandscapeImportLayerInfo> Layers;
+
+	// WayTypes corresponding to each layer. Only layer names referenced in the material assigned above are shown here. Modify the material to add more layers.
+	UPROPERTY(Category = "Landscape", EditAnywhere, NonTransactional, EditFixedSize, meta = (DisplayName = "Layer Ways", ShowForTools = "Landscape"))
+		TArray<FLayerWayMapping> LayerWayMapping;
+	
+	FStreetMapLandscapeBuildSettings() 
+		: QuadSize(4.0f)
+		, Radius(8192)
+		, BlendGauge(8.0f)
+		, Material(nullptr)
+	{
+	}
+};
+
+/** Railway generation settings */
+USTRUCT(BlueprintType)
+struct STREETMAPRUNTIME_API FStreetMapRailwayBuildSettings
+{
+	GENERATED_USTRUCT_BODY()
+
+public:
+
+	// Landscape where to put the railways onto
+	UPROPERTY(Category = "Railway", EditAnywhere)
+		ALandscapeProxy* Landscape;
+
+	// Track segment used to build the railroad line via Landscape Spline Meshes.
+	UPROPERTY(Category = "Railway", EditAnywhere)
+		UStaticMesh* RailwayLineMesh;
+
+
+	FStreetMapRailwayBuildSettings()
+		: Landscape(nullptr)
+		, RailwayLineMesh(nullptr)
+	{
+	}
+};
 
 /** Types of roads */
 UENUM( BlueprintType )
@@ -269,6 +403,58 @@ struct STREETMAPRUNTIME_API FStreetMapNode
 };
 
 
+/** Types of railways */
+UENUM(BlueprintType)
+enum EStreetMapRailwayType
+{
+	/** Full sized passenger or freight trains in the standard gauge for the country or state. */
+	Rail,
+
+	/** A higher-standard tram system, normally in its own right-of-way. */
+	LightRail,
+
+	/** A city passenger rail service running mostly grade separated. */
+	Subway,
+
+	/** One or two carriage rail vehicles, usually sharing motor road. */
+	Tram,
+
+	/** Other (monorail, abandoned, construction, disused, funicular, etc.) */
+	OtherRailway,
+};
+
+
+/** A railway */
+USTRUCT(BlueprintType)
+struct STREETMAPRUNTIME_API FStreetMapRailway
+{
+	GENERATED_USTRUCT_BODY()
+
+	/** Name of the railway */
+	UPROPERTY(Category = StreetMap, EditAnywhere)
+	FString Name;
+
+	/** Type of railway */
+	UPROPERTY(Category = StreetMap, EditAnywhere)
+		TEnumAsByte<EStreetMapRailwayType> Type;
+
+	/** List of all of the points on this raiway */
+	UPROPERTY(Category = StreetMap, EditAnywhere)
+		TArray<FVector2D> Points;
+
+	// @todo: Performance: Bounding information could be computed at load time if we want to avoid the memory cost of storing it
+
+	/** 2D bounds (min) of this railway's points */
+	UPROPERTY(Category = StreetMap, EditAnywhere)
+		FVector2D BoundsMin;
+
+	/** 2D bounds (max) of this railway's points */
+	UPROPERTY(Category = StreetMap, EditAnywhere)
+		FVector2D BoundsMax;
+};
+
+
+
 /** A building */
 USTRUCT( BlueprintType )
 struct STREETMAPRUNTIME_API FStreetMapBuilding
@@ -302,6 +488,43 @@ struct STREETMAPRUNTIME_API FStreetMapBuilding
 	FVector2D BoundsMax;
 };
 
+
+/** A miscellaneous way */
+USTRUCT(BlueprintType)
+struct STREETMAPRUNTIME_API FStreetMapMiscWay
+{
+	GENERATED_USTRUCT_BODY()
+
+	/** Name of the way */
+	UPROPERTY(Category = StreetMap, EditAnywhere)
+		FString Name;
+
+	/** Category of the way */
+	UPROPERTY(Category = StreetMap, EditAnywhere)
+		FString Category;
+
+	/** points that define the the way (line or polygon) */
+	UPROPERTY(Category = StreetMap, EditAnywhere)
+		TArray<FVector2D> Points;
+
+	// @todo: Performance: Bounding information could be computed at load time if we want to avoid the memory cost of storing it
+
+	/** 2D bounds (min) of this way's points */
+	UPROPERTY(Category = StreetMap, EditAnywhere)
+		FVector2D BoundsMin;
+
+	/** 2D bounds (max) of this way's points */
+	UPROPERTY(Category = StreetMap, EditAnywhere)
+		FVector2D BoundsMax;
+
+	/** The OSM type this way is marked as */
+	UPROPERTY(Category = StreetMap, EditAnywhere)
+		TEnumAsByte<EStreetMapMiscWayType> Type;
+
+	/** Indicates whether this a closed polygon or just a line strip */
+	UPROPERTY(Category = StreetMap, EditAnywhere)
+		bool bIsClosed;
+};
 
 /** A loaded street map */
 UCLASS()
@@ -353,6 +576,31 @@ public:
 		return Buildings;
 	}
 
+	/** Gets all of the railways (read only) */
+	const TArray<FStreetMapRailway>& GetRailways() const
+	{
+		return Railways;
+	}
+
+	/** Gets all of the railways */
+	TArray<FStreetMapRailway>& GetRailways()
+	{
+		return Railways;
+	}
+
+	/** Gets all of the miscellaneous ways (read only) */
+	const TArray<FStreetMapMiscWay>& GetMiscWays() const
+	{
+		return MiscWays;
+	}
+
+	/** Gets all of the miscellaneous ways */
+	TArray<FStreetMapMiscWay>& GetMiscWays()
+	{
+		return MiscWays;
+	}
+
+
 	/** Gets the bounding box of the map */
 	FVector2D GetBoundsMin() const
 	{
@@ -363,6 +611,14 @@ public:
 		return BoundsMax;
 	}
 
+	double GetOriginLongitude() const
+	{
+		return OriginLongitude;
+	}
+	double GetOriginLatitude() const
+	{
+		return OriginLatitude;
+	}
 
 protected:
 	
@@ -378,6 +634,14 @@ protected:
 	UPROPERTY( Category=StreetMap, VisibleAnywhere)
 	TArray<FStreetMapBuilding> Buildings;
 
+	/** List of railways */
+	UPROPERTY(Category = StreetMap, VisibleAnywhere)
+	TArray<FStreetMapRailway> Railways;
+
+	/** List of all miscellaneous ways on the street map */
+	UPROPERTY(Category = StreetMap, VisibleAnywhere)
+	TArray<FStreetMapMiscWay> MiscWays;
+
 	/** 2D bounds (min) of this map's roads and buildings */
 	UPROPERTY( Category=StreetMap, VisibleAnywhere)
 	FVector2D BoundsMin;
@@ -385,6 +649,13 @@ protected:
 	/** 2D bounds (max) of this map's roads and buildings */
 	UPROPERTY( Category=StreetMap, VisibleAnywhere)
 	FVector2D BoundsMax;
+
+	/** Longitude Origin of the SpatialReferenceSystem */
+	UPROPERTY(Category = StreetMap, VisibleAnywhere)
+	double OriginLongitude;
+	/** Latitude Origin of the SpatialReferenceSystem */
+	UPROPERTY(Category = StreetMap, VisibleAnywhere)
+	double OriginLatitude;
 
 #if WITH_EDITORONLY_DATA
 	/** Importing data and options used for this mesh */
