@@ -71,7 +71,7 @@ static FString GetCachedFilePath(uint32 X, uint32 Y, uint32 Z)
 class FCachedElevationFile
 {
 private:
-	const int32 MaxNumPendingDownloads = 10;
+	const int32 MaxNumPendingDownloads = 1; // the number of parallel downloads is very limited
 	static int32 NumPendingDownloads;
 
 	const FTiledMap& TiledMap;

@@ -161,10 +161,6 @@ public:
 	double MaxLatitude = -MAX_dbl;
 	double MaxLongitude = -MAX_dbl;
 
-	// Average Latitude (roughly the center of the map)
-	double AverageLatitude = 0.0;
-	double AverageLongitude = 0.0;
-
 	FSpatialReferenceSystem SpatialReferenceSystem;
 
 	// All ways we've parsed
@@ -194,6 +190,7 @@ protected:
 	enum class ParsingState
 	{
 		Root,
+		Bounds,
 		Node,
 		Node_Tag,
 		Way,
@@ -201,7 +198,7 @@ protected:
 		Way_Tag,
 		Relation,
 		Relation_Member,
-		Relation_Tag
+		Relation_Tag,
 	};
 		
 	// Current state of parser

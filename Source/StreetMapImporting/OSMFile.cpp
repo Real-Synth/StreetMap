@@ -48,15 +48,19 @@ bool FOSMFile::LoadOpenStreetMapFile( FString& OSMFilePath, const bool bIsFilePa
 		/* Out */ ErrorMessage, 
 		/* Out */ ErrorLineNumber ) )
 	{
-		if( NodeMap.Num() > 0 )
+		if (MinLongitude == MAX_dbl || MinLatitude == MAX_dbl ||
+			MaxLatitude == -MAX_dbl || MaxLongitude == -MAX_dbl)
 		{
-			AverageLatitude /= NodeMap.Num();
-			AverageLongitude /= NodeMap.Num();
-
-			SpatialReferenceSystem = FSpatialReferenceSystem(AverageLongitude, AverageLatitude);
+			FeedbackContext->Logf(ELogVerbosity::Error, TEXT("Missing valid bounds in OpenStreetMap XML file"));
 		}
+		else
+		{
+			SpatialReferenceSystem = FSpatialReferenceSystem(
+				(MaxLongitude - MinLongitude) * 0.5 + MinLongitude,
+				(MaxLatitude - MinLatitude) * 0.5 + MinLatitude);
 
-		return true;
+			return true;
+		}
 	}
 
 	if( FeedbackContext != nullptr )
@@ -116,6 +120,10 @@ bool FOSMFile::ProcessElement( const TCHAR* ElementName, const TCHAR* ElementDat
 			CurrentRelation = new FOSMRelation();
 			CurrentRelation->Type = EOSMRelationType::Other;
 		}
+		else if (!FCString::Stricmp(ElementName, TEXT("bounds")))
+		{
+			ParsingState = ParsingState::Bounds;
+		}
 	}
 	else if (ParsingState == ParsingState::Node)
 	{
@@ -165,36 +173,10 @@ bool FOSMFile::ProcessAttribute( const TCHAR* AttributeName, const TCHAR* Attrib
 		else if( !FCString::Stricmp( AttributeName, TEXT( "lat" ) ) )
 		{
 			CurrentNodeInfo->Latitude = FPlatformString::Atod( AttributeValue );
-
-			AverageLatitude += CurrentNodeInfo->Latitude;
-					
-			// Update minimum and maximum latitude
-			// @todo: Performance: Instead of computing our own bounding box, we could parse the "minlat" and
-			//        "minlon" tags from the OSM file
-			if( CurrentNodeInfo->Latitude < MinLatitude )
-			{
-				MinLatitude = CurrentNodeInfo->Latitude;
-			}
-			if( CurrentNodeInfo->Latitude > MaxLatitude )
-			{
-				MaxLatitude = CurrentNodeInfo->Latitude;
-			}
 		}
 		else if( !FCString::Stricmp( AttributeName, TEXT( "lon" ) ) )
 		{
 			CurrentNodeInfo->Longitude = FPlatformString::Atod( AttributeValue );
-
-			AverageLongitude += CurrentNodeInfo->Longitude;
-					
-			// Update minimum and maximum longitude
-			if( CurrentNodeInfo->Longitude < MinLongitude )
-			{
-				MinLongitude = CurrentNodeInfo->Longitude;
-			}
-			if( CurrentNodeInfo->Longitude > MaxLongitude )
-			{
-				MaxLongitude = CurrentNodeInfo->Longitude;
-			}
 		}
 	}
 	else if (ParsingState == ParsingState::Node_Tag)
@@ -391,6 +373,25 @@ bool FOSMFile::ProcessAttribute( const TCHAR* AttributeName, const TCHAR* Attrib
 			}
 		}
 	}
+	else if (ParsingState == ParsingState::Bounds)
+	{
+		if (!FCString::Stricmp(AttributeName, TEXT("minlat")))
+		{
+			MinLatitude = FPlatformString::Atod(AttributeValue);
+		}
+		else if (!FCString::Stricmp(AttributeName, TEXT("maxlat")))
+		{
+			MaxLatitude = FPlatformString::Atod(AttributeValue);
+		}
+		else if (!FCString::Stricmp(AttributeName, TEXT("minlon")))
+		{
+			MinLongitude = FPlatformString::Atod(AttributeValue);
+		}
+		else if (!FCString::Stricmp(AttributeName, TEXT("maxlon")))
+		{
+			MaxLongitude = FPlatformString::Atod(AttributeValue);
+		}
+	}
 
 	return true;
 }
@@ -443,6 +444,10 @@ bool FOSMFile::ProcessClose( const TCHAR* Element )
 	{
 		CurrentWayTagKey = TEXT("");
 		ParsingState = ParsingState::Relation;
+	}
+	else if (ParsingState == ParsingState::Bounds)
+	{
+		ParsingState = ParsingState::Root;
 	}
 
 	return true;
