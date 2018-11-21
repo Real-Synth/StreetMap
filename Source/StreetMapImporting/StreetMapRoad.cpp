@@ -23,6 +23,11 @@ static void BuildStreetMapRoads(class UStreetMapComponent* StreetMapComponent,
 
 	for (const FStreetMapRoad& Road : Roads)
 	{
+		if (BuildSettings.Type != Road.RoadType)
+		{
+			continue;
+		}
+
 		ULandscapeSplineControlPoint* PreviousPoint = nullptr;
 		const int32 NumPoints = Road.RoadPoints.Num();
 		for (int32 PointIndex = 0; PointIndex < NumPoints; PointIndex++)

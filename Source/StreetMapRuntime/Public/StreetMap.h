@@ -291,6 +291,24 @@ public:
 };
 
 
+/** Types of roads */
+UENUM(BlueprintType)
+enum EStreetMapRoadType
+{
+	/** Small road or residential street */
+	Street,
+
+	/** Major road or minor state highway */
+	MajorRoad,
+
+	/** Highway */
+	Highway,
+
+	/** Other (path, bus route, etc) */
+	Other,
+};
+
+
 /** Roads as LandscapeSpline generation settings */
 USTRUCT(BlueprintType)
 struct STREETMAPRUNTIME_API FStreetMapRoadBuildSettings
@@ -306,6 +324,9 @@ public:
 	// Track segment used to build the roads via Landscape Spline Meshes.
 	UPROPERTY(Category = "Road", EditAnywhere)
 		UStaticMesh* RoadMesh;
+
+	UPROPERTY(Category = "Road", EditAnywhere)
+		TEnumAsByte<EStreetMapRoadType > Type;
 
 	// Scales mesh to width of landscape spline
 	UPROPERTY(Category = "Road", EditAnywhere)
@@ -330,7 +351,7 @@ public:
 	/** Chooses the up axis for the spline mesh orientation */
 	UPROPERTY(Category = "Road", EditAnywhere)
 		TEnumAsByte<ESplineMeshAxis::Type> UpAxis;
-
+	
 	FStreetMapRoadBuildSettings()
 		: Landscape(nullptr)
 		, RoadMesh(nullptr)
@@ -384,23 +405,6 @@ public:
 		, Type(EStreetMapSplineBuildType::CinematicRigRail)
 	{
 	}
-};
-
-/** Types of roads */
-UENUM( BlueprintType )
-enum EStreetMapRoadType
-{
-	/** Small road or residential street */
-	Street,
-	
-	/** Major road or minor state highway */
-	MajorRoad,
-	
-	/** Highway */
-	Highway,
-	
-	/** Other (path, bus route, etc) */
-	Other,
 };
 
 
